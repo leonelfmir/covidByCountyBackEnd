@@ -6,27 +6,18 @@ const memoize = require('memoizee');
 
 const apiUrl = 'https://raw.githubusercontent.com/microsoft/Bing-COVID-19-Data/master/data/Bing-COVID19-Data.csv';
 
-const cache = {
-    data: null,
-    csvData: null,
-    date: null
-};
-
 const port = 3030;
 
 const app = express();
 app.use(cors());
 
+
+
+
 app.get('/csv', async function (req, res) {
     try {
-        if (cache.data === null) {
-            const response = await axios.get(apiUrl);
-            cache.data = response.data;
-            const content = cache.data;
-            const csv = await neatCsv(content);
-            cache.csvData = csv;
-        }
-        res.json(cache.csvData);
+        const csvData = await getDataMemo()
+        res.json(csvData);
     }
     catch (ex) {
         console.log(ex);
@@ -38,16 +29,8 @@ app.get('/csv/:county', async function (req, res) {
     const countyName = req.params['county'];
     const county = `${countyName} County`;
     try {
-        if (cache.data === null) {
-            const response = await axios.get(apiUrl);
-            cache.data = response.data;
-            const content = cache.data;
-            const csv = await neatCsv(content);
-            cache.csvData = csv;
-        }
-
-        const allData = cache.csvData;
-        const casesInCounty = allData.filter(d => d.AdminRegion2 === county);
+        const csvData = await getDataMemo()
+        const casesInCounty = csvData.filter(d => d.AdminRegion2 === county);
         res.json(casesInCounty);
     }
     catch (ex) {
@@ -60,3 +43,13 @@ app.get('/csv/:county', async function (req, res) {
 
 app.listen(port);
 console.log(`service started at port ${port}`);
+
+async function getData() {
+    const response = await axios.get(apiUrl);
+    const content = response.data;
+    const csv = await neatCsv(content);
+    return csv;
+}
+
+const saveTime = 1000 * 60 * 60 * 10;
+const getDataMemo = memoize(getData, {maxAge: saveTime});
